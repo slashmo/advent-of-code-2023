@@ -11,6 +11,6 @@ final class Day01Tests: XCTestCase {
 
     func testPart1() throws {
         let challenge = Day01(data: testData)
-        XCTAssertEqual("\(challenge.part1())", "142")
+        XCTAssertEqual(try XCTUnwrap(challenge.part1() as? Int), 142)
     }
 }
