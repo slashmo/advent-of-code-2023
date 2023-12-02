@@ -4,38 +4,32 @@ struct Day01: AdventDay {
     let data: String
 
     func part1() -> Any {
-        /*
-         Get mutable substring of input so we can pop the next character
-         until we reached the end of the input.
-         */
-        var input = data[...]
+        let input = data[...].utf8
+        return input.withContiguousStorageIfAvailable({ part1(input: $0) }) ?? part1(input: input)
+    }
 
-        // The first number character of the currently inspected line
-        var firstValue: Character?
-        // The last number character of the currently inspected line
-        var lastValue: Character?
-
+    private func part1<Input>(input: Input) -> Int where Input: BidirectionalCollection<UTF8.CodeUnit> {
         var sum = 0
 
-        while let next = input.popFirst() {
-            if next.isWholeNumber {
-                if firstValue == nil {
-                    firstValue = next
-                    lastValue = next
-                } else {
-                    lastValue = next
-                }
-            }
+        var startIndex = input.startIndex
+        let singleDigitCodeUnitRange = UTF8.CodeUnit(49) ... UTF8.CodeUnit(57)
 
-            if next.isNewline || input.isEmpty {
-                guard let first = firstValue, let last = lastValue else {
-                    fatalError("Received malformed input.")
-                }
-                sum += Int(String([first, last]))!
+        func value(in line: Input.SubSequence) -> Int {
+            let firstValue = line.first(where: { singleDigitCodeUnitRange ~= $0 })!
+            let lastValue = line.last(where: { singleDigitCodeUnitRange ~= $0 })!
+            return Int(String(decoding: [firstValue, lastValue], as: UTF8.self))!
+        }
 
-                firstValue = nil
-                lastValue = nil
-            }
+        while let newLineIndex = input[startIndex...].firstIndex(of: 10) {
+            let line = input[startIndex ..< newLineIndex]
+            sum += value(in: line)
+            startIndex = input.index(after: line.endIndex)
+        }
+
+        // look at final line if needed
+        if startIndex < input.endIndex {
+            let line = input[startIndex...]
+            sum += value(in: line)
         }
 
         return sum
