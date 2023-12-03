@@ -10,7 +10,7 @@ struct Day02: AdventDay {
         return input.withContiguousStorageIfAvailable { part1(input: $0) } ?? part1(input: input)
     }
 
-    func part1<Input>(input: Input) -> Int where Input: Collection<UTF8.CodeUnit> {
+    private func part1<Input>(input: Input) -> Int where Input: Collection<UTF8.CodeUnit> {
         var startIndex = input.startIndex
         var sum = 0
 
@@ -29,6 +29,30 @@ struct Day02: AdventDay {
         return sum
     }
 
+    func part2() -> Any {
+        let input = data[...].utf8
+        return input.withContiguousStorageIfAvailable { part2(input: $0) } ?? part2(input: input)
+    }
+
+    private func part2<Input>(input: Input) -> Int where Input: Collection<UTF8.CodeUnit> {
+        var startIndex = input.startIndex
+        var sum = 0
+
+        while let newLineIndex = input[startIndex...].firstIndex(of: 10) {
+            let line = input[startIndex ..< newLineIndex]
+            sum += power(of: line)
+            startIndex = input.index(after: line.endIndex)
+        }
+
+        // look at final line if needed
+        if startIndex < input.endIndex {
+            let line = input[startIndex...]
+            sum += power(of: line)
+        }
+
+        return sum
+    }
+
     private let colorLookup: [Color: [UTF8.CodeUnit]] = [
         .red: [101, 100],
         .green: [114, 101, 101, 110],
@@ -39,8 +63,73 @@ struct Day02: AdventDay {
 
     private func summand<Line>(in line: Line) -> Int where Line: Collection<UTF8.CodeUnit> {
         var index = line.startIndex
-        let gameID = parseGameID(from: line, index: &index)
+        let gameID = parseGameID(line: line, index: &index)
 
+        while let (color, count) = parseNextCubeCount(line: line, index: &index) {
+            if count > color.availableCount {
+                return 0
+            }
+        }
+
+        return gameID
+    }
+
+    private func power<Line>(of line: Line) -> Int where Line: Collection<UTF8.CodeUnit> {
+        var index = line.startIndex
+        parseGameID(line: line, index: &index)
+
+        var redMultiplier = 0
+        var greenMultiplier = 0
+        var blueMultiplier = 0
+
+        while let (color, count) = parseNextCubeCount(line: line, index: &index) {
+            switch color {
+            case .red:
+                redMultiplier = max(redMultiplier, count)
+            case .green:
+                greenMultiplier = max(greenMultiplier, count)
+            case .blue:
+                blueMultiplier = max(blueMultiplier, count)
+            }
+        }
+
+        return redMultiplier * greenMultiplier * blueMultiplier
+    }
+
+    @discardableResult
+    private func parseGameID<Line>(line: Line, index: inout Line.Index) -> Int where Line: Collection<UTF8.CodeUnit> {
+        let colon: UTF8.CodeUnit = 58
+        var idStartIndex: Line.Index?
+        var idEndIndex: Line.Index?
+
+        while index < line.endIndex, line[index] != colon {
+            let codeUnit = line[index]
+            if singleDigitCodeUnitRange ~= codeUnit {
+                if idStartIndex == nil {
+                    idStartIndex = index
+                    idEndIndex = index
+                } else {
+                    idEndIndex = index
+                }
+            }
+            line.formIndex(after: &index)
+        }
+
+        // skip ": "
+        line.formIndex(&index, offsetBy: 2)
+
+        guard let idStartIndex, let idEndIndex else {
+            fatalError(#"Line does not contain game ID: \#(String(decoding: line, as: UTF8.self))"#)
+        }
+
+        let gameID = Int(String(decoding: line[idStartIndex ... idEndIndex], as: UTF8.self))!
+        return gameID
+    }
+
+    private func parseNextCubeCount<Line>(
+        line: Line,
+        index: inout Line.Index
+    ) -> (color: Color, count: Int)? where Line: Collection<UTF8.CodeUnit> {
         var cubeCountStartIndex: Line.Index?
         var cubeCountEndIndex: Line.Index?
 
@@ -78,47 +167,13 @@ struct Day02: AdventDay {
                 cubeCountStartIndex = nil
                 cubeCountEndIndex = nil
                 let count = Int(String(decoding: line[countStartIndex...countEndIndex], as: UTF8.self))!
-                if count > color.availableCount {
-                    return 0
-                }
+                return (color, count)
             }
 
             line.formIndex(after: &index)
         }
 
-        return gameID
-    }
-
-    private func parseGameID<Line>(
-        from line: Line,
-        index: inout Line.Index
-    ) -> Int where Line: Collection<UTF8.CodeUnit> {
-        let colon: UTF8.CodeUnit = 58
-        var idStartIndex: Line.Index?
-        var idEndIndex: Line.Index?
-
-        while index < line.endIndex, line[index] != colon {
-            let codeUnit = line[index]
-            if singleDigitCodeUnitRange ~= codeUnit {
-                if idStartIndex == nil {
-                    idStartIndex = index
-                    idEndIndex = index
-                } else {
-                    idEndIndex = index
-                }
-            }
-            line.formIndex(after: &index)
-        }
-
-        // skip ": "
-        line.formIndex(&index, offsetBy: 2)
-
-        guard let idStartIndex, let idEndIndex else {
-            fatalError(#"Line does not contain game ID: \#(String(decoding: line, as: UTF8.self))"#)
-        }
-
-        let gameID = Int(String(decoding: line[idStartIndex ... idEndIndex], as: UTF8.self))!
-        return gameID
+        return nil
     }
 
     enum Color: UTF8.CodeUnit {
